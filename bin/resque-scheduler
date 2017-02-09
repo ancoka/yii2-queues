@@ -1,0 +1,77 @@
+#!/usr/bin/env php
+<?php
+require(__DIR__ . '/../../../../vendor/autoload.php');
+require(__DIR__ . '/../../../../vendor/yiisoft/yii2/Yii.php');
+$config = require(__DIR__ . '/../../../../config/console.php');
+$application = new yii\console\Application($config);
+
+
+$RESQUE_PHP = getenv('RESQUE_PHP');
+if (!empty($RESQUE_PHP)) {
+    require_once $RESQUE_PHP;
+} elseif (!class_exists('queues\Resque')) {
+    // Otherwise, if we have no Resque then assume it is in the include path
+    require_once(__DIR__ . '/../src/Resque.php');
+}
+
+// Load resque-scheduler
+require_once(__DIR__ . '/../src/ResqueScheduler.php');
+require_once(__DIR__ . '/../src/resqueScheduler/ResqueSchedulerWorker.php');
+
+Yii::$app->resque->init();
+
+$REDIS_BACKEND = getenv('REDIS_BACKEND');
+$REDIS_BACKEND_DB = getenv('REDIS_BACKEND_DB');
+if (!empty($REDIS_BACKEND)) {
+    if (empty($REDIS_BACKEND_DB)) {
+        queues\Resque::setBackend($REDIS_BACKEND);
+    } else {
+        queues\Resque::setBackend($REDIS_BACKEND, $REDIS_BACKEND_DB);
+    }
+}
+
+// Set log level for resque-scheduler
+$logLevel = 0;
+$LOGGING = getenv('LOGGING');
+$VERBOSE = getenv('VERBOSE');
+$VVERBOSE = getenv('VVERBOSE');
+if (!empty($LOGGING) || !empty($VERBOSE)) {
+    $logLevel = queues\resqueScheduler\ResqueSchedulerWorker::LOG_NORMAL;
+} elseif (!empty($VVERBOSE)) {
+    $logLevel = queues\resqueScheduler\ResqueSchedulerWorker::LOG_VERBOSE;
+}
+
+// Check for jobs every $interval seconds
+$interval = 5;
+$INTERVAL = getenv('INTERVAL');
+if (!empty($INTERVAL)) {
+    $interval = $INTERVAL;
+}
+
+// Load the user's application if one exists
+$APP_INCLUDE = getenv('APP_INCLUDE');
+if ($APP_INCLUDE) {
+    if (!file_exists($APP_INCLUDE)) {
+        die('APP_INCLUDE (' . $APP_INCLUDE . ") does not exist." . PHP_EOL);
+    }
+
+    require_once $APP_INCLUDE;
+}
+
+$PREFIX = getenv('PREFIX');
+if (!empty($PREFIX)) {
+    fwrite(STDOUT, '*** Prefix set to ' . $PREFIX . PHP_EOL);
+    queues\Resque::redis()->prefix($PREFIX);
+}
+
+$worker = new queues\resqueScheduler\ResqueSchedulerWorker();
+$worker->logLevel = $logLevel;
+
+$PIDFILE = getenv('PIDFILE');
+if ($PIDFILE) {
+    file_put_contents($PIDFILE, getmypid()) or
+        die('Could not write PID information to ' . $PIDFILE . PHP_EOL);
+}
+
+fwrite(STDOUT, "*** Starting scheduler worker" . PHP_EOL);
+$worker->work($interval);
