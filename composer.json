@@ -1,13 +1,13 @@
 {
-    "name": "soyaf518/yii2-queues",
+    "name": "ancoka/yii2-queues",
     "description": "A queuning service which is implemented by redis for Yii2 framework.",
     "type": "yii2-extension",
     "keywords": ["yii2","extension","queue","resque"],
     "license": "MIT",
     "authors": [
         {
-            "name": "江小溅",
-            "email": "soyaf518@gmail.com"
+            "name": "ancoka",
+            "email": "jackun@163.com"
         }
     ],
     "require": {
